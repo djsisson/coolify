@@ -2094,7 +2094,8 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                         ]);
                         $build_command = "docker build {$this->addHosts} --network host -f {$this->workdir}/.nixpacks/Dockerfile {$this->build_args} --progress plain -t {$this->build_image_name} {$this->workdir}";
                     }
-
+                    $this->dockerfile_location = '/.nixpacks/Dockerfile';
+                    $this->add_build_env_variables_to_dockerfile();
                     $base64_build_command = base64_encode($build_command);
                     $this->execute_remote_command(
                         [
@@ -2211,6 +2212,8 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                         ]);
                         $build_command = "docker build {$this->addHosts} --network host -f {$this->workdir}/.nixpacks/Dockerfile {$this->build_args} --progress plain -t {$this->production_image_name} {$this->workdir}";
                     }
+                    $this->dockerfile_location = '/.nixpacks/Dockerfile';
+                    $this->add_build_env_variables_to_dockerfile();
                     $base64_build_command = base64_encode($build_command);
                     $this->execute_remote_command(
                         [
@@ -2344,23 +2347,25 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             'save' => 'dockerfile',
         ]);
         $dockerfile = collect(str($this->saved_outputs->get('dockerfile'))->trim()->explode("\n"));
+        $argLines = [];
         if ($this->pull_request_id === 0) {
             foreach ($this->application->build_environment_variables as $env) {
                 if (data_get($env, 'is_multiline') === true) {
-                    $dockerfile->splice(1, 0, "ARG {$env->key}");
+                    $argLines[] = "ARG {$env->key}";
                 } else {
-                    $dockerfile->splice(1, 0, "ARG {$env->key}={$env->real_value}");
+                    $argLines[] = "ARG {$env->key}={$env->real_value}";
                 }
             }
         } else {
             foreach ($this->application->build_environment_variables_preview as $env) {
                 if (data_get($env, 'is_multiline') === true) {
-                    $dockerfile->splice(1, 0, "ARG {$env->key}");
+                    $argLines[] = "ARG {$env->key}";
                 } else {
-                    $dockerfile->splice(1, 0, "ARG {$env->key}={$env->real_value}");
+                    $argLines[] = "ARG {$env->key}={$env->real_value}";
                 }
             }
         }
+        $dockerfile->splice(0, 0, $argLines);
         $dockerfile_base64 = base64_encode($dockerfile->implode("\n"));
         $this->execute_remote_command([
             executeInDocker($this->deployment_uuid, "echo '{$dockerfile_base64}' | base64 -d | tee {$this->workdir}{$this->dockerfile_location} > /dev/null"),
