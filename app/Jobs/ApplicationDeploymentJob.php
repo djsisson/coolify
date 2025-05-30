@@ -2365,7 +2365,22 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 }
             }
         }
-        $dockerfile->splice(0, 0, $argLines);
+        
+        $spliceIndex = null;
+        foreach ($dockerfile as $index => $line) {
+            if ($this->application->build_pack === 'nixpacks' && str_starts_with($line, 'FROM')) {
+                $spliceIndex = $index + 1;
+                break;
+            } elseif (str_starts_with($line, '#COOLIFYBUILDARGS')) {
+                $spliceIndex = $index + 1;
+                break;
+            }
+        }
+
+        if ($spliceIndex !== null) {
+            $dockerfile->splice($spliceIndex, 0, $argLines);
+        }
+
         $dockerfile_base64 = base64_encode($dockerfile->implode("\n"));
         $this->execute_remote_command([
             executeInDocker($this->deployment_uuid, "echo '{$dockerfile_base64}' | base64 -d | tee {$this->workdir}{$this->dockerfile_location} > /dev/null"),
