@@ -540,6 +540,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         if ($this->application->settings->is_raw_compose_deployment_enabled) {
             if ($this->docker_compose_custom_start_command) {
                 $this->write_deployment_configurations();
+                if (! str($this->docker_compose_custom_start_command)->contains('--env-file') && $this->env_filename) {
+                    $this->docker_compose_custom_start_command = str($this->docker_compose_custom_start_command)->replaceFirst('compose', 'compose --env-file '.$this->workdir.'/'.$this->env_filename)->value();
+                }
                 $this->execute_remote_command(
                     [executeInDocker($this->deployment_uuid, "cd {$this->workdir} && {$this->docker_compose_custom_start_command}"), 'hidden' => true],
                 );
@@ -559,6 +562,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         } else {
             if ($this->docker_compose_custom_start_command) {
                 $this->write_deployment_configurations();
+                if (! str($this->docker_compose_custom_start_command)->contains('--env-file') && $this->env_filename) {
+                    $this->docker_compose_custom_start_command = str($this->docker_compose_custom_start_command)->replaceFirst('compose', 'compose --env-file '.$this->workdir.'/'.$this->env_filename)->value();
+                }
                 $this->execute_remote_command(
                     [executeInDocker($this->deployment_uuid, "cd {$this->basedir} && {$this->docker_compose_custom_start_command}"), 'hidden' => true],
                 );
