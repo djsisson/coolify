@@ -497,6 +497,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->application_deployment_queue->addLogEntry('Pulling & building required images.');
 
         if ($this->docker_compose_custom_build_command) {
+            if (! str($this->docker_compose_custom_build_command)->contains('--env-file') && $this->env_filename) {
+                    $this->docker_compose_custom_build_command = str($this->docker_compose_custom_build_command)->replaceFirst('compose', 'compose --env-file '.$this->workdir.'/'.$this->env_filename)->value();
+                }
             $this->execute_remote_command(
                 [executeInDocker($this->deployment_uuid, "cd {$this->basedir} && {$this->docker_compose_custom_build_command}"), 'hidden' => true],
             );
