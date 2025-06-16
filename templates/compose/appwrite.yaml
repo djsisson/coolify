@@ -5,14 +5,18 @@
 
 services:
   appwrite:
-    image: appwrite/appwrite:1.6.0
+    image: appwrite/appwrite:1.7.4
     container_name: appwrite
+    restart: unless-stopped
     volumes:
       - appwrite-uploads:/storage/uploads:rw
+      - appwrite-imports:/storage/imports:rw
       - appwrite-cache:/storage/cache:rw
       - appwrite-config:/storage/config:rw
       - appwrite-certificates:/storage/certificates:rw
       - appwrite-functions:/storage/functions:rw
+      - appwrite-sites:/storage/sites:rw
+      - appwrite-builds:/storage/builds:rw
     depends_on:
       - appwrite-mariadb
       - appwrite-redis
@@ -21,8 +25,10 @@ services:
       - _APP_ENV=${_APP_ENV:-production}
       - _APP_WORKER_PER_CORE=${_APP_WORKER_PER_CORE:-6}
       - _APP_LOCALE=${_APP_LOCALE:-en}
+      - _APP_COMPRESSION_MIN_SIZE_BYTES=${_APP_COMPRESSION_MIN_SIZE_BYTES:-1024}
       - _APP_CONSOLE_WHITELIST_ROOT=${_APP_CONSOLE_WHITELIST_ROOT:-enabled}
       - _APP_CONSOLE_WHITELIST_EMAILS=${_APP_CONSOLE_WHITELIST_EMAILS}
+      - _APP_CONSOLE_SESSION_ALERTS=${_APP_CONSOLE_SESSION_ALERTS:-disabled}
       - _APP_CONSOLE_WHITELIST_IPS=${_APP_CONSOLE_WHITELIST_IPS}
       - _APP_CONSOLE_HOSTNAMES=${_APP_CONSOLE_HOSTNAMES:-localhost,appwrite.io,*.appwrite.io}
       - _APP_SYSTEM_EMAIL_NAME=${_APP_SYSTEM_EMAIL_NAME:-Appwrite}
@@ -36,7 +42,9 @@ services:
       - _APP_OPTIONS_FUNCTIONS_FORCE_HTTPS=${_APP_OPTIONS_FUNCTIONS_FORCE_HTTPS:-disabled}
       - _APP_OPENSSL_KEY_V1=$SERVICE_PASSWORD_64_APPWRITE
       - _APP_DOMAIN=$SERVICE_URL_APPWRITE
-      - _APP_DOMAIN_TARGET=$SERVICE_URL_APPWRITE
+      - _APP_DOMAIN_TARGET_CNAME=${_APP_DOMAIN_TARGET_CNAME:-localhost}
+      - _APP_DOMAIN_TARGET_AAAA=${_APP_DOMAIN_TARGET_AAAA:-::1}
+      - _APP_DOMAIN_TARGET_A=${_APP_DOMAIN_TARGET_A:-127.0.0.1}
       - _APP_DOMAIN_FUNCTIONS=$SERVICE_URL_APPWRITE
       - _APP_REDIS_HOST=${_APP_REDIS_HOST:-appwrite-redis}
       - _APP_REDIS_PORT=${_APP_REDIS_PORT:-6379}
@@ -79,21 +87,26 @@ services:
       - _APP_STORAGE_WASABI_SECRET=${_APP_STORAGE_WASABI_SECRET}
       - _APP_STORAGE_WASABI_REGION=${_APP_STORAGE_WASABI_REGION:-eu-central-1}
       - _APP_STORAGE_WASABI_BUCKET=${_APP_STORAGE_WASABI_BUCKET}
-      - _APP_FUNCTIONS_SIZE_LIMIT=${_APP_FUNCTIONS_SIZE_LIMIT:-30000000}
+      - _APP_COMPUTE_SIZE_LIMIT=${_APP_COMPUTE_SIZE_LIMIT:-30000000}
       - _APP_FUNCTIONS_TIMEOUT=${_APP_FUNCTIONS_TIMEOUT:-900}
-      - _APP_FUNCTIONS_BUILD_TIMEOUT=${_APP_FUNCTIONS_BUILD_TIMEOUT:-900}
-      - _APP_FUNCTIONS_CPUS=${_APP_FUNCTIONS_CPUS:-0}
-      - _APP_FUNCTIONS_MEMORY=${_APP_FUNCTIONS_MEMORY:-0}
+      - _APP_SITES_TIMEOUT=${_APP_SITES_TIMEOUT:-900}
+      - _APP_COMPUTE_BUILD_TIMEOUT=${_APP_COMPUTE_BUILD_TIMEOUT:-900}
+      - _APP_COMPUTE_CPUS=${_APP_COMPUTE_CPUS:-0}
+      - _APP_COMPUTE_MEMORY=${_APP_COMPUTE_MEMORY:-0}
       - _APP_FUNCTIONS_RUNTIMES=${_APP_FUNCTIONS_RUNTIMES:-node-20.0,php-8.2,python-3.11,ruby-3.2}
+      - _APP_SITES_RUNTIMES=${_APP_SITES_RUNTIMES:-static-1,node-22,flutter-3.29}
+      - _APP_DOMAIN_SITES=${_APP_DOMAIN_SITES}
       - _APP_EXECUTOR_SECRET=$SERVICE_PASSWORD_64_APPWRITE
       - _APP_EXECUTOR_HOST=${_APP_EXECUTOR_HOST:-http://appwrite-executor/v1}
       - _APP_LOGGING_CONFIG=${_APP_LOGGING_CONFIG}
       - _APP_MAINTENANCE_INTERVAL=${_APP_MAINTENANCE_INTERVAL:-86400}
       - _APP_MAINTENANCE_DELAY=${_APP_MAINTENANCE_DELAY}
+      - _APP_MAINTENANCE_START_TIME=${_APP_MAINTENANCE_START_TIME}
       - _APP_MAINTENANCE_RETENTION_EXECUTION=${_APP_MAINTENANCE_RETENTION_EXECUTION:-1209600}
       - _APP_MAINTENANCE_RETENTION_CACHE=${_APP_MAINTENANCE_RETENTION_CACHE:-2592000}
       - _APP_MAINTENANCE_RETENTION_ABUSE=${_APP_MAINTENANCE_RETENTION_ABUSE:-86400}
       - _APP_MAINTENANCE_RETENTION_AUDIT=${_APP_MAINTENANCE_RETENTION_AUDIT:-1209600}
+      - _APP_MAINTENANCE_RETENTION_AUDIT_CONSOLE=${_APP_MAINTENANCE_RETENTION_AUDIT_CONSOLE:-1209600}
       - _APP_MAINTENANCE_RETENTION_USAGE_HOURLY=${_APP_MAINTENANCE_RETENTION_USAGE_HOURLY:-8640000}
       - _APP_MAINTENANCE_RETENTION_SCHEDULES=${_APP_MAINTENANCE_RETENTION_SCHEDULES:-86400}
       - _APP_SMS_PROVIDER=${_APP_SMS_PROVIDER}
@@ -112,15 +125,17 @@ services:
       - _APP_ASSISTANT_OPENAI_API_KEY=${_APP_ASSISTANT_OPENAI_API_KEY}
 
   appwrite-console:
-    image: appwrite/console:5.0.12
+    image: appwrite/console:6.0.13
     container_name: appwrite-console
+    restart: unless-stopped
     environment:
       - SERVICE_FQDN_APPWRITE=/console
 
   appwrite-realtime:
-    image: appwrite/appwrite:1.6.0
+    image: appwrite/appwrite:1.7.4
     entrypoint: realtime
     container_name: appwrite-realtime
+    restart: unless-stopped
     depends_on:
       - appwrite-mariadb
       - appwrite-redis
@@ -129,6 +144,7 @@ services:
       - _APP_ENV=${_APP_ENV:-production}
       - _APP_WORKER_PER_CORE=${_APP_WORKER_PER_CORE:-6}
       - _APP_OPTIONS_ABUSE=${_APP_OPTIONS_ABUSE:-enabled}
+      - _APP_OPTIONS_ROUTER_PROTECTION=${_APP_OPTIONS_ROUTER_PROTECTION:-enabled}
       - _APP_OPENSSL_KEY_V1=$SERVICE_PASSWORD_64_APPWRITE
       - _APP_REDIS_HOST=${_APP_REDIS_HOST:-appwrite-redis}
       - _APP_REDIS_PORT=${_APP_REDIS_PORT:-6379}
@@ -143,9 +159,10 @@ services:
       - _APP_LOGGING_CONFIG=${_APP_LOGGING_CONFIG}
 
   appwrite-worker-audits:
-    image: appwrite/appwrite:1.6.0
+    image: appwrite/appwrite:1.7.4
     entrypoint: worker-audits
     container_name: appwrite-worker-audits
+    restart: unless-stopped
     depends_on:
       - appwrite-redis
       - appwrite-mariadb
@@ -165,9 +182,10 @@ services:
       - _APP_LOGGING_CONFIG=${_APP_LOGGING_CONFIG}
 
   appwrite-worker-webhooks:
-    image: appwrite/appwrite:1.6.0
+    image: appwrite/appwrite:1.7.4
     entrypoint: worker-webhooks
     container_name: appwrite-worker-webhooks
+    restart: unless-stopped
     depends_on:
       - appwrite-redis
       - appwrite-mariadb
@@ -189,9 +207,10 @@ services:
       - _APP_LOGGING_CONFIG=${_APP_LOGGING_CONFIG}
 
   appwrite-worker-deletes:
-    image: appwrite/appwrite:1.6.0
+    image: appwrite/appwrite:1.7.4
     entrypoint: worker-deletes
     container_name: appwrite-worker-deletes
+    restart: unless-stopped
     depends_on:
       - appwrite-redis
       - appwrite-mariadb
@@ -199,6 +218,7 @@ services:
       - appwrite-uploads:/storage/uploads:rw
       - appwrite-cache:/storage/cache:rw
       - appwrite-functions:/storage/functions:rw
+      - appwrite-sites:/storage/sites:rw
       - appwrite-builds:/storage/builds:rw
       - appwrite-certificates:/storage/certificates:rw
     environment:
@@ -240,12 +260,16 @@ services:
       - _APP_EXECUTOR_HOST=${_APP_EXECUTOR_HOST:-http://appwrite-executor/v1}
       - _APP_MAINTENANCE_RETENTION_ABUSE=${_APP_MAINTENANCE_RETENTION_ABUSE:-86400}
       - _APP_MAINTENANCE_RETENTION_AUDIT=${_APP_MAINTENANCE_RETENTION_AUDIT:-1209600}
+      - _APP_MAINTENANCE_RETENTION_AUDIT_CONSOLE=${_APP_MAINTENANCE_RETENTION_AUDIT_CONSOLE:-1209600}
       - _APP_MAINTENANCE_RETENTION_EXECUTION=${_APP_MAINTENANCE_RETENTION_EXECUTION:-1209600}
+      - _APP_SYSTEM_SECURITY_EMAIL_ADDRESS=${_APP_SYSTEM_SECURITY_EMAIL_ADDRESS}
+      - _APP_EMAIL_CERTIFICATES=${_APP_EMAIL_CERTIFICATES}
 
   appwrite-worker-databases:
-    image: appwrite/appwrite:1.6.0
+    image: appwrite/appwrite:1.7.4
     entrypoint: worker-databases
     container_name: appwrite-worker-databases
+    restart: unless-stopped
     depends_on:
       - appwrite-redis
       - appwrite-mariadb
@@ -265,15 +289,18 @@ services:
       - _APP_LOGGING_CONFIG=${_APP_LOGGING_CONFIG}
 
   appwrite-worker-builds:
-    image: appwrite/appwrite:1.6.0
+    image: appwrite/appwrite:1.7.4
     entrypoint: worker-builds
     container_name: appwrite-worker-builds
+    restart: unless-stopped
     depends_on:
       - appwrite-redis
       - appwrite-mariadb
     volumes:
       - appwrite-functions:/storage/functions:rw
+      - appwrite-sites:/storage/sites:rw
       - appwrite-builds:/storage/builds:rw
+      - appwrite-uploads:/storage/uploads:rw
     environment:
       - _APP_ENV=${_APP_ENV:-production}
       - _APP_WORKER_PER_CORE=${_APP_WORKER_PER_CORE:-6}
@@ -294,10 +321,11 @@ services:
       - _APP_VCS_GITHUB_PRIVATE_KEY=${_APP_VCS_GITHUB_PRIVATE_KEY}
       - _APP_VCS_GITHUB_APP_ID=${_APP_VCS_GITHUB_APP_ID}
       - _APP_FUNCTIONS_TIMEOUT=${_APP_FUNCTIONS_TIMEOUT:-900}
-      - _APP_FUNCTIONS_BUILD_TIMEOUT=${_APP_FUNCTIONS_BUILD_TIMEOUT:-900}
-      - _APP_FUNCTIONS_CPUS=${_APP_FUNCTIONS_CPUS:-0}
-      - _APP_FUNCTIONS_MEMORY=${_APP_FUNCTIONS_MEMORY:-0}
-      - _APP_FUNCTIONS_SIZE_LIMIT=${_APP_FUNCTIONS_SIZE_LIMIT:-30000000}
+      - _APP_SITES_TIMEOUT=${_APP_SITES_TIMEOUT:-900}
+      - _APP_COMPUTE_BUILD_TIMEOUT=${_APP_COMPUTE_BUILD_TIMEOUT:-900}
+      - _APP_COMPUTE_CPUS=${_APP_COMPUTE_CPUS:-0}
+      - _APP_COMPUTE_MEMORY=${_APP_COMPUTE_MEMORY:-0}
+      - _APP_COMPUTE_SIZE_LIMIT=${_APP_COMPUTE_SIZE_LIMIT:-30000000}
       - _APP_OPTIONS_FORCE_HTTPS=${_APP_OPTIONS_FORCE_HTTPS:-disabled}
       - _APP_OPTIONS_FUNCTIONS_FORCE_HTTPS=${_APP_OPTIONS_FUNCTIONS_FORCE_HTTPS:-disabled}
       - _APP_DOMAIN=$SERVICE_URL_APPWRITE
@@ -322,11 +350,13 @@ services:
       - _APP_STORAGE_WASABI_SECRET=${_APP_STORAGE_WASABI_SECRET}
       - _APP_STORAGE_WASABI_REGION=${_APP_STORAGE_WASABI_REGION:-eu-central-1}
       - _APP_STORAGE_WASABI_BUCKET=${_APP_STORAGE_WASABI_BUCKET}
+      - _APP_DOMAIN_SITES=$SERVICE_URL_APPWRITE
 
   appwrite-worker-certificates:
-    image: appwrite/appwrite:1.6.0
+    image: appwrite/appwrite:1.7.4
     entrypoint: worker-certificates
     container_name: appwrite-worker-certificates
+    restart: unless-stopped
     depends_on:
       - appwrite-redis
       - appwrite-mariadb
@@ -338,10 +368,11 @@ services:
       - _APP_WORKER_PER_CORE=${_APP_WORKER_PER_CORE:-6}
       - _APP_OPENSSL_KEY_V1=$SERVICE_PASSWORD_64_APPWRITE
       - _APP_DOMAIN=$SERVICE_URL_APPWRITE
-      - _APP_DOMAIN_TARGET=$SERVICE_URL_APPWRITE
+      - _APP_DOMAIN_TARGET_CNAME=${_APP_DOMAIN_TARGET_CNAME:-localhost}
+      - _APP_DOMAIN_TARGET_AAAA=${_APP_DOMAIN_TARGET_AAAA:-::1}
+      - _APP_DOMAIN_TARGET_A=${_APP_DOMAIN_TARGET_A:-127.0.0.1}
       - _APP_DOMAIN_FUNCTIONS=$SERVICE_URL_APPWRITE
       - _APP_EMAIL_CERTIFICATES=${_APP_EMAIL_CERTIFICATES:-enabled}
-      - _APP_EMAIL_SECURITY=${_APP_EMAIL_SECURITY:-certs@appwrite.io}
       - _APP_REDIS_HOST=${_APP_REDIS_HOST:-appwrite-redis}
       - _APP_REDIS_PORT=${_APP_REDIS_PORT:-6379}
       - _APP_REDIS_USER=${_APP_REDIS_USER}
@@ -354,9 +385,10 @@ services:
       - _APP_LOGGING_CONFIG=${_APP_LOGGING_CONFIG}
 
   appwrite-worker-functions:
-    image: appwrite/appwrite:1.6.0
+    image: appwrite/appwrite:1.7.4
     entrypoint: worker-functions
     container_name: appwrite-worker-functions
+    restart: unless-stopped
     depends_on:
       - appwrite-redis
       - appwrite-mariadb
@@ -377,9 +409,10 @@ services:
       - _APP_DB_USER=$SERVICE_USER_MARIADB
       - _APP_DB_PASS=$SERVICE_PASSWORD_MARIADB
       - _APP_FUNCTIONS_TIMEOUT=${_APP_FUNCTIONS_TIMEOUT:-900}
-      - _APP_FUNCTIONS_BUILD_TIMEOUT=${_APP_FUNCTIONS_BUILD_TIMEOUT:-900}
-      - _APP_FUNCTIONS_CPUS=${_APP_FUNCTIONS_CPUS:-0}
-      - _APP_FUNCTIONS_MEMORY=${_APP_FUNCTIONS_MEMORY:-0}
+      - _APP_SITES_TIMEOUT=${_APP_SITES_TIMEOUT:-900}
+      - _APP_COMPUTE_BUILD_TIMEOUT=${_APP_COMPUTE_BUILD_TIMEOUT:-900}
+      - _APP_COMPUTE_CPUS=${_APP_COMPUTE_CPUS:-0}
+      - _APP_COMPUTE_MEMORY=${_APP_COMPUTE_MEMORY:-0}
       - _APP_EXECUTOR_SECRET=$SERVICE_PASSWORD_64_APPWRITE
       - _APP_EXECUTOR_HOST=${_APP_EXECUTOR_HOST:-http://appwrite-executor/v1}
       - _APP_USAGE_STATS=${_APP_USAGE_STATS:-enabled}
@@ -388,9 +421,10 @@ services:
       - _APP_LOGGING_CONFIG=${_APP_LOGGING_CONFIG}
 
   appwrite-worker-mails:
-    image: appwrite/appwrite:1.6.0
+    image: appwrite/appwrite:1.7.4
     entrypoint: worker-mails
     container_name: appwrite-worker-mails
+    restart: unless-stopped
     depends_on:
       - appwrite-redis
     environment:
@@ -415,11 +449,13 @@ services:
       - _APP_SMTP_PASSWORD=${_APP_SMTP_PASSWORD}
       - _APP_LOGGING_CONFIG=${_APP_LOGGING_CONFIG}
       - _APP_DOMAIN=$SERVICE_URL_APPWRITE
+      - _APP_OPTIONS_FORCE_HTTPS=${_APP_OPTIONS_FORCE_HTTPS:-disabled}
 
   appwrite-worker-messaging:
-    image: appwrite/appwrite:1.6.0
+    image: appwrite/appwrite:1.7.4
     entrypoint: worker-messaging
     container_name: appwrite-worker-messaging
+    restart: unless-stopped
     volumes:
       - appwrite-uploads:/storage/uploads:rw
     depends_on:
@@ -463,9 +499,10 @@ services:
       - _APP_STORAGE_WASABI_BUCKET=${_APP_STORAGE_WASABI_BUCKET}
 
   appwrite-worker-migrations:
-    image: appwrite/appwrite:1.6.0
+    image: appwrite/appwrite:1.7.4
     entrypoint: worker-migrations
     container_name: appwrite-worker-migrations
+    restart: unless-stopped
     depends_on:
       - appwrite-mariadb
     environment:
@@ -473,7 +510,9 @@ services:
       - _APP_WORKER_PER_CORE=${_APP_WORKER_PER_CORE:-6}
       - _APP_OPENSSL_KEY_V1=$SERVICE_PASSWORD_64_APPWRITE
       - _APP_DOMAIN=$SERVICE_URL_APPWRITE
-      - _APP_DOMAIN_TARGET=$SERVICE_URL_APPWRITE
+      - _APP_DOMAIN_TARGET_CNAME=${_APP_DOMAIN_TARGET_CNAME:-localhost}
+      - _APP_DOMAIN_TARGET_AAAA=${_APP_DOMAIN_TARGET_AAAA:-::1}
+      - _APP_DOMAIN_TARGET_A=${_APP_DOMAIN_TARGET_A:-127.0.0.1}
       - _APP_EMAIL_SECURITY=${_APP_EMAIL_SECURITY:-certs@appwrite.io}
       - _APP_REDIS_HOST=${_APP_REDIS_HOST:-appwrite-redis}
       - _APP_REDIS_PORT=${_APP_REDIS_PORT:-6379}
@@ -489,16 +528,19 @@ services:
       - _APP_MIGRATIONS_FIREBASE_CLIENT_SECRET=${_APP_MIGRATIONS_FIREBASE_CLIENT_SECRET}
 
   appwrite-task-maintenance:
-    image: appwrite/appwrite:1.6.0
+    image: appwrite/appwrite:1.7.4
     entrypoint: maintenance
     container_name: appwrite-task-maintenance
+    restart: unless-stopped
     depends_on:
       - appwrite-redis
     environment:
       - _APP_ENV=${_APP_ENV:-production}
       - _APP_WORKER_PER_CORE=${_APP_WORKER_PER_CORE:-6}
       - _APP_DOMAIN=$SERVICE_URL_APPWRITE
-      - _APP_DOMAIN_TARGET=$SERVICE_URL_APPWRITE
+      - _APP_DOMAIN_TARGET_CNAME=${_APP_DOMAIN_TARGET_CNAME:-localhost}
+      - _APP_DOMAIN_TARGET_AAAA=${_APP_DOMAIN_TARGET_AAAA:-::1}
+      - _APP_DOMAIN_TARGET_A=${_APP_DOMAIN_TARGET_A:-127.0.0.1}
       - _APP_DOMAIN_FUNCTIONS=$SERVICE_URL_APPWRITE
       - _APP_OPENSSL_KEY_V1=$SERVICE_PASSWORD_64_APPWRITE
       - _APP_REDIS_HOST=${_APP_REDIS_HOST:-appwrite-redis}
@@ -515,13 +557,14 @@ services:
       - _APP_MAINTENANCE_RETENTION_CACHE=${_APP_MAINTENANCE_RETENTION_CACHE:-2592000}
       - _APP_MAINTENANCE_RETENTION_ABUSE=${_APP_MAINTENANCE_RETENTION_ABUSE:-86400}
       - _APP_MAINTENANCE_RETENTION_AUDIT=${_APP_MAINTENANCE_RETENTION_AUDIT:-1209600}
+      - _APP_MAINTENANCE_RETENTION_AUDIT_CONSOLE=${_APP_MAINTENANCE_RETENTION_AUDIT_CONSOLE:-1209600}
       - _APP_MAINTENANCE_RETENTION_USAGE_HOURLY=${_APP_MAINTENANCE_RETENTION_USAGE_HOURLY:-8640000}
       - _APP_MAINTENANCE_RETENTION_SCHEDULES=${_APP_MAINTENANCE_RETENTION_SCHEDULES:-86400}
 
-  appwrite-worker-usage:
-    image: appwrite/appwrite:1.6.0
-    entrypoint: worker-usage
-    container_name: appwrite-worker-usage
+  appwrite-task-stats-resources:
+    image: appwrite/appwrite:1.7.4
+    entrypoint: stats-resources
+    container_name: appwrite-task-stats-resources
     restart: unless-stopped
     depends_on:
       - appwrite-redis
@@ -541,12 +584,14 @@ services:
       - _APP_REDIS_PASS=${_APP_REDIS_PASS}
       - _APP_USAGE_STATS=${_APP_USAGE_STATS:-enabled}
       - _APP_LOGGING_CONFIG=${_APP_LOGGING_CONFIG}
-      - _APP_USAGE_AGGREGATION_INTERVAL=${_APP_USAGE_AGGREGATION_INTERVAL:-30}
+      - _APP_DATABASE_SHARED_TABLES=${_APP_DATABASE_SHARED_TABLES:-enabled}
+      - _APP_STATS_RESOURCES_INTERVAL=${_APP_STATS_RESOURCES_INTERVAL:-60}
 
-  appwrite-worker-usage-dump:
-    image: appwrite/appwrite:1.6.0
-    entrypoint: worker-usage-dump
-    container_name: appwrite-worker-usage-dump
+  appwrite-worker-stats-resources:
+    image: appwrite/appwrite:1.7.4
+    entrypoint: worker-stats-resources
+    container_name: appwrite-worker-stats-resources
+    restart: unless-stopped
     depends_on:
       - appwrite-redis
       - appwrite-mariadb
@@ -565,11 +610,37 @@ services:
       - _APP_REDIS_PASS=${_APP_REDIS_PASS}
       - _APP_USAGE_STATS=${_APP_USAGE_STATS:-enabled}
       - _APP_LOGGING_CONFIG=${_APP_LOGGING_CONFIG}
-      - _APP_USAGE_AGGREGATION_INTERVAL=${_APP_USAGE_AGGREGATION_INTERVAL:-30}
+      - _APP_STATS_RESOURCES_INTERVAL=${_APP_STATS_RESOURCES_INTERVAL:-60}
+
+  appwrite-worker-stats-usage:
+    image: appwrite/appwrite:1.7.4
+    entrypoint: worker-stats-usage
+    container_name: appwrite-worker-stats-usage
+    restart: unless-stopped
+    depends_on:
+      - appwrite-redis
+      - appwrite-mariadb
+    environment:
+      - _APP_ENV=${_APP_ENV:-production}
+      - _APP_WORKER_PER_CORE=${_APP_WORKER_PER_CORE:-6}
+      - _APP_OPENSSL_KEY_V1=$SERVICE_PASSWORD_64_APPWRITE
+      - _APP_DB_HOST=${_APP_DB_HOST:-appwrite-mariadb}
+      - _APP_DB_PORT=${_APP_DB_PORT:-3306}
+      - _APP_DB_SCHEMA=${_APP_DB_SCHEMA:-appwrite}
+      - _APP_DB_USER=$SERVICE_USER_MARIADB
+      - _APP_DB_PASS=$SERVICE_PASSWORD_MARIADB
+      - _APP_REDIS_HOST=${_APP_REDIS_HOST:-appwrite-redis}
+      - _APP_REDIS_PORT=${_APP_REDIS_PORT:-6379}
+      - _APP_REDIS_USER=${_APP_REDIS_USER}
+      - _APP_REDIS_PASS=${_APP_REDIS_PASS}
+      - _APP_USAGE_STATS=${_APP_USAGE_STATS:-enabled}
+      - _APP_LOGGING_CONFIG=${_APP_LOGGING_CONFIG}
+      - _APP_USAGE_AGGREGATION_INTERVAL=${_APP_USAGE_AGGREGATION_INTERVAL:-60}
 
   appwrite-task-scheduler-functions:
-    image: appwrite/appwrite:1.6.0
+    image: appwrite/appwrite:1.7.4
     entrypoint: schedule-functions
+    restart: unless-stopped
     container_name: appwrite-task-scheduler-functions
     depends_on:
       - appwrite-mariadb
@@ -589,7 +660,7 @@ services:
       - _APP_DB_PASS=$SERVICE_PASSWORD_MARIADB
 
   appwrite-task-scheduler-executions:
-    image: appwrite/appwrite:1.6.0
+    image: appwrite/appwrite:1.7.4
     entrypoint: schedule-executions
     container_name: appwrite-task-scheduler-executions
     depends_on:
@@ -610,8 +681,9 @@ services:
       - _APP_DB_PASS=$SERVICE_PASSWORD_MARIADB
 
   appwrite-task-scheduler-messages:
-    image: appwrite/appwrite:1.6.0
+    image: appwrite/appwrite:1.7.4
     entrypoint: schedule-messages
+    restart: unless-stopped
     container_name: appwrite-task-scheduler-messages
     depends_on:
       - appwrite-mariadb
@@ -636,17 +708,24 @@ services:
     environment:
       - _APP_ASSISTANT_OPENAI_API_KEY=${_APP_ASSISTANT_OPENAI_API_KEY}
 
+  appwrite-browser:
+    image: appwrite/appwrite:1.7.4
+    container_name: appwrite-browser
+    restart: unless-stopped
+
   openruntimes-executor:
     container_name: openruntimes-executor
     hostname: appwrite-executor
+    restart: unless-stopped
     stop_signal: SIGINT
-    image: openruntimes/executor:0.6.11
+    image: openruntimes/executor:0.7.14
     networks:
       - runtimes
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - appwrite-builds:/storage/builds:rw
       - appwrite-functions:/storage/functions:rw
+      - appwrite-sites:/storage/sites:rw
       - /tmp:/tmp:rw
     environment:
       - OPR_EXECUTOR_INACTIVE_TRESHOLD=${_APP_FUNCTIONS_INACTIVE_THRESHOLD}
@@ -683,6 +762,7 @@ services:
   appwrite-mariadb:
     image: mariadb:10.11
     container_name: appwrite-mariadb
+    restart: unless-stopped
     volumes:
       - appwrite-mariadb:/var/lib/mysql:rw
     environment:
@@ -696,6 +776,7 @@ services:
   appwrite-redis:
     image: redis:7.2.4-alpine
     container_name: appwrite-redis
+    restart: unless-stopped
     command: >
       redis-server
       --maxmemory            512mb
